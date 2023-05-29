@@ -32,9 +32,9 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *
- * Author: Shivang Patel
+ * Derived from Straight line planner tutorial by Shivang Patel
  *
- * Reference tutorial:
+ * Original tutorial:
  * https://navigation.ros.org/tutorials/docs/writing_new_nav2planner_plugin.html
  *********************************************************************/
 
