@@ -1,0 +1,5 @@
+<library path="nav2_fixed_path_planner_plugin">
+	<class name="nav2_fixed_path_planner/FixedPath" type="nav2_fixed_path_planner::FixedPath" base_class_type="nav2_core::GlobalPlanner">
+	  <description>This is custom plugin which creates a path given a set of waypoints. Each waypoint is connected by a straighline.</description>
+	</class>
+</library>
