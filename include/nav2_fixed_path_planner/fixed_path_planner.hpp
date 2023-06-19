@@ -96,6 +96,11 @@ public:
     const geometry_msgs::msg::PoseStamped & goal) override;
 
 private:
+  int FindClosestOnPath(
+    const std::vector<Waypoint> & waypoints,
+    const geometry_msgs::msg::PoseStamped & position,
+    bool closest_in_front, double ref_angle);
+
   rcl_interfaces::msg::SetParametersResult dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);
 
   bool parseWaypoints(

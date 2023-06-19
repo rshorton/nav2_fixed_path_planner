@@ -112,6 +112,68 @@ double FixedPath::to_degrees(double rads) const
   return rads/M_PI*180.0;
 }
 
+int FixedPath::FindClosestOnPath(
+  const std::vector<Waypoint> & waypoints,
+  const geometry_msgs::msg::PoseStamped & position,
+  bool closest_in_front, double ref_angle)
+{
+  struct PointAttribs {
+    PointAttribs(int idx, double angle, double dist):
+      idx(idx),
+      angle(angle),
+      dist(dist)
+    {}
+    int idx;
+    double angle;
+    double dist;
+  };
+
+  // Calc angle off from current pose and distance to each path point
+  std::vector<PointAttribs> point_attribs;
+  for (int i = 0; i < waypoints.size(); i++) {
+    point_attribs.emplace_back(PointAttribs(i, atan2(waypoints[i].y - position.pose.position.y, waypoints[i].x - position.pose.position.x),
+                                         std::hypot(waypoints[i].y - position.pose.position.y, waypoints[i].x - position.pose.position.x)));
+    RCLCPP_INFO(node_->get_logger(), "Point %d, (%f, %f), angle: %f, dist: %f", i, waypoints[i].x, waypoints[i].y,
+      to_degrees(point_attribs.back().angle), point_attribs.back().dist);
+  }
+
+  for (auto &a: point_attribs) {
+    a.angle -= ref_angle;
+    RCLCPP_DEBUG(node_->get_logger(), "Diff angle-yaw: %f", to_degrees(a.angle));
+  }
+
+  sort(point_attribs.begin(), point_attribs.end(), 
+    [](const auto &a, const auto &b)
+    { 
+      return abs(a.dist) < abs(b.dist); 
+    });
+
+#ifdef EXTRA_DEBUG
+  RCLCPP_INFO(node_->get_logger(), "Sorted waypoints by dist:");
+  for (const auto &a: point_attribs) {
+    RCLCPP_INFO(node_->get_logger(), "idx: %d, angle: %f, dist: %f", a.idx, to_degrees(a.angle), a.dist);
+  }
+#endif  
+
+  
+  auto idx = -1;
+
+  for (const auto &a: point_attribs) {
+    if (!closest_in_front || abs(a.angle) < MAX_OFF_HEADING_ANGLE) {
+      idx = a.idx;
+      RCLCPP_INFO(node_->get_logger(), "Closest point is idx: %d, angle: %f, dist: %f", a.idx, to_degrees(a.angle), a.dist);
+      break;
+    }
+  }
+
+  // Use the closest if no point is withing the heading tolerance
+  if (idx == -1) {
+    idx = point_attribs.front().idx;
+  }
+  return idx;
+}
+
+
 nav_msgs::msg::Path FixedPath::createPlan(
   const geometry_msgs::msg::PoseStamped & start,
   const geometry_msgs::msg::PoseStamped & goal)
@@ -150,66 +212,20 @@ nav_msgs::msg::Path FixedPath::createPlan(
   }
 
   // Algorithm:
-  //  1. Calc distance and angle offset from current heading for each path point
+  //  1. Calc distance and angle offset from current heading for each path waypoint
   //  2. Sort list by distance
-  //  3. Create path starting with the closest point
+  //  3. Pick closest waypoint in front of current position
+  //  4. Create path starting with the closest waypoint
+  //  5. Stop at the waypoint closest to the specified goal
 
-  struct PointAttribs {
-    PointAttribs(int idx, double angle, double dist):
-      idx(idx),
-      angle(angle),
-      dist(dist)
-    {}
-    int idx;
-    double angle;
-    double dist;
-  };
+  auto idx = FindClosestOnPath(waypoints, start, true, yaw);
+  auto idx_last = FindClosestOnPath(waypoints, goal, false, 0.0);
 
-  // Calc angle off from current pose and distance to each path point
-  std::vector<PointAttribs> point_attribs;
-  for (int i = 0; i < waypoints.size(); i++) {
-    point_attribs.emplace_back(PointAttribs(i, atan2(waypoints[i].y - start.pose.position.y, waypoints[i].x - start.pose.position.x),
-                                         std::hypot(waypoints[i].y - start.pose.position.y, waypoints[i].x - start.pose.position.x)));
-    RCLCPP_INFO(node_->get_logger(), "Point %d, (%f, %f), angle: %f, dist: %f", i, waypoints[i].x, waypoints[i].y,
-      to_degrees(point_attribs.back().angle), point_attribs.back().dist);
-  }
-
-  for (auto &a: point_attribs) {
-    a.angle -= yaw;
-    RCLCPP_DEBUG(node_->get_logger(), "Diff angle-yaw: %f", to_degrees(a.angle));
-  }
-
-  sort(point_attribs.begin(), point_attribs.end(), 
-    [](const auto &a, const auto &b)
-    { 
-      return abs(a.dist) < abs(b.dist); 
-    });
-
-#ifdef EXTRA_DEBUG
-  RCLCPP_INFO(node_->get_logger(), "Sorted waypoints by dist:");
-  for (const auto &a: point_attribs) {
-    RCLCPP_INFO(node_->get_logger(), "idx: %d, angle: %f, dist: %f", a.idx, to_degrees(a.angle), a.dist);
-  }
-#endif  
 
   double prev_x = start.pose.position.x;
   double prev_y = start.pose.position.y;
 
-  auto idx = -1;
-
-  for (const auto &a: point_attribs) {
-    if (abs(a.angle) < MAX_OFF_HEADING_ANGLE) {
-      idx = a.idx;
-      RCLCPP_INFO(node_->get_logger(), "First point is idx: %d, angle: %f, dist: %f", a.idx, to_degrees(a.angle), a.dist);
-      break;
-    }
-  }
-
-  if (idx == -1) {
-    idx = point_attribs.front().idx;
-  }
-
-  for (int p = 0; p < waypoints.size()/2; p++) {
+  for (int p = 0; p < waypoints.size(); p++) {
     // Calculate the number of interpolation loops between the next pairs of path points
     int total_number_of_loop = std::hypot(waypoints[idx].x - prev_x, waypoints[idx].y - prev_y) /
       interpolation_resolution;
@@ -235,6 +251,10 @@ nav_msgs::msg::Path FixedPath::createPlan(
 
     prev_x = waypoints[idx].x;
     prev_y = waypoints[idx].y;
+
+    if (idx == idx_last) {
+      break;
+    }
 
     if (++idx >= waypoints.size()) {
       idx = 0;
