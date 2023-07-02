@@ -133,7 +133,7 @@ int FixedPath::FindClosestOnPath(
   for (int i = 0; i < waypoints.size(); i++) {
     point_attribs.emplace_back(PointAttribs(i, atan2(waypoints[i].y - position.pose.position.y, waypoints[i].x - position.pose.position.x),
                                          std::hypot(waypoints[i].y - position.pose.position.y, waypoints[i].x - position.pose.position.x)));
-    RCLCPP_INFO(node_->get_logger(), "Point %d, (%f, %f), angle: %f, dist: %f", i, waypoints[i].x, waypoints[i].y,
+    RCLCPP_DEBUG(node_->get_logger(), "Point %d, (%f, %f), angle: %f, dist: %f", i, waypoints[i].x, waypoints[i].y,
       to_degrees(point_attribs.back().angle), point_attribs.back().dist);
   }
 
@@ -161,7 +161,7 @@ int FixedPath::FindClosestOnPath(
   for (const auto &a: point_attribs) {
     if (!closest_in_front || abs(a.angle) < MAX_OFF_HEADING_ANGLE) {
       idx = a.idx;
-      RCLCPP_INFO(node_->get_logger(), "Closest point is idx: %d, angle: %f, dist: %f", a.idx, to_degrees(a.angle), a.dist);
+      RCLCPP_DEBUG(node_->get_logger(), "Closest point is idx: %d, angle: %f, dist: %f", a.idx, to_degrees(a.angle), a.dist);
       break;
     }
   }
@@ -189,7 +189,7 @@ nav_msgs::msg::Path FixedPath::createPlan(
   }
 
   if (goal.header.frame_id != global_frame_) {
-    RCLCPP_INFO(
+    RCLCPP_ERROR(
       node_->get_logger(), "Planner will only except goal position from %s frame",
       global_frame_.c_str());
     return global_path;
@@ -200,7 +200,7 @@ nav_msgs::msg::Path FixedPath::createPlan(
   global_path.header.frame_id = global_frame_;
 
   double yaw = tf2::getYaw(start.pose.orientation);
-  RCLCPP_INFO(node_->get_logger(), "start pose angle: %f", to_degrees(yaw));
+  RCLCPP_DEBUG(node_->get_logger(), "start pose angle: %f", to_degrees(yaw));
 
   // Make a copy of params since they can change via dynamic reconfig while in use
   double interpolation_resolution = 0.0;
@@ -327,7 +327,7 @@ bool FixedPath::parseWaypoints(
   }
 
   for (int i = 0; i < waypoints_.size(); i++) {
-    RCLCPP_INFO(
+    RCLCPP_DEBUG(
       node_->get_logger(), "Waypoint: %d, (%f, %f)",
       i, waypoints_[i].x, waypoints_[i].y);
   }
