@@ -42,7 +42,7 @@
 #include <string>
 #include <memory>
 #include "nav2_util/node_utils.hpp"
-#include "nav2_costmap_2d/array_parser.hpp"
+#include "nav2_util/array_parser.hpp"
 
 #include "nav2_fixed_path_planner/fixed_path_planner.hpp"
 
@@ -176,7 +176,8 @@ int FixedPath::FindClosestOnPath(
 
 nav_msgs::msg::Path FixedPath::createPlan(
   const geometry_msgs::msg::PoseStamped & start,
-  const geometry_msgs::msg::PoseStamped & goal)
+  const geometry_msgs::msg::PoseStamped & goal,
+  std::function<bool()> cancel_checker)
 {
   nav_msgs::msg::Path global_path;
 
@@ -295,7 +296,7 @@ bool FixedPath::parseWaypoints(
   std::vector<Waypoint> &waypoints) const
 {
   std::string error;
-  std::vector<std::vector<float>> vvf = nav2_costmap_2d::parseVVF(waypoints_string, error);
+  std::vector<std::vector<float>> vvf = nav2_util::parseVVF(waypoints_string, error);
 
   if (error != "") {
     RCLCPP_ERROR(
